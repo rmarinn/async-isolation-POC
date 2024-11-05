@@ -56,6 +56,13 @@ impl Jwt {
     }
 }
 
+// We can't build to WASM with this
+// use uuid7::uuid4;
+// fn create_uuid() {
+//     let uuid = uuid4();
+//     println!("Uuid Generated: {uuid:?}");
+// }
+
 fn run_cedar() {
     println!("Testing Cedar:");
 
@@ -95,4 +102,5 @@ async fn main() {
     cedarling.authz().await;
     println!("authz done");
     run_cedar();
+    // create_uuid();
 }

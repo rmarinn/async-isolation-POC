@@ -7,3 +7,4 @@ edition = "2021"
 cedar-policy = "4.2.1"
 threadpool = "1.8.1"
 tokio = { version = "1.41.0", features = ["macros", "rt", "time"] }
+# uuid7 = { version = "1.1.0", features = ["serde"] } # we cant build to WASM with this
