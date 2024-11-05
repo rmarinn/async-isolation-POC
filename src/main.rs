@@ -1,6 +1,9 @@
-use cedar_policy::{Authorizer, Context, Entities, PolicySet, Request};
-use std::sync::{Arc, RwLock};
-use tokio::time::{sleep, Duration};
+use ehttp::Request;
+use std::{
+    sync::{Arc, RwLock},
+    thread,
+    time::Duration,
+};
 
 #[allow(dead_code)]
 struct Cedarling {
@@ -15,8 +18,13 @@ impl Cedarling {
         Self { authz, jwt }
     }
 
-    async fn authz(&self) {
-        self.jwt.validate_tokens().await;
+    fn authz(&self) {
+        self.jwt.validate_tokens();
+    }
+
+    fn print_jwks(&self) {
+        let jwks = self.jwt.jwks.read().unwrap();
+        println!("{:?}", jwks);
     }
 }
 
@@ -32,7 +40,7 @@ impl Authz {
 #[allow(dead_code)]
 struct Jwt {
     config: JwtConfig,
-    jwks: Arc<RwLock<Option<String>>>,
+    pub jwks: Arc<RwLock<Option<serde_json::Value>>>,
 }
 struct JwtConfig;
 
@@ -44,70 +52,32 @@ impl Jwt {
         }
     }
 
-    async fn validate_tokens(&self) {
-        // simulate network delay
-        println!("sending http request");
-        sleep(Duration::from_millis(1000)).await;
-        println!("received http response");
+    fn validate_tokens(&self) {
+        let jwks = self.jwks.clone();
+        let request = Request::get("https://test-casa.gluu.info/jans-auth/restv1/jwks");
 
-        // update local jwks
-        let mut jwks = self.jwks.write().expect("failed to obtain write lock");
-        *jwks = Some("jwks".to_string());
+        ehttp::fetch(request, move |result| match result {
+            Ok(resp) => {
+                // update local jwks
+                let jwks_resp: serde_json::Value = serde_json::from_slice(&resp.bytes).unwrap();
+                let mut jwks = jwks.write().unwrap();
+                *jwks = Some(jwks_resp);
+            }
+            Err(_) => todo!(),
+        });
     }
 }
 
-// We can't build to WASM with this
-// use uuid7::uuid4;
-// fn create_uuid() {
-//     let uuid = uuid4();
-//     println!("Uuid Generated: {uuid:?}");
-// }
-
-// NOTE: replace uuid7 with uuid
-use uuid::Uuid;
-fn create_uuid() {
-    let uuid = Uuid::new_v4();
-    println!("Uuid Generated: {uuid:?}");
-}
-
-fn run_cedar() {
-    println!("Testing Cedar:");
-
-    const POLICY_SRC: &str = r#"
-permit(principal == User::"alice", action == Action::"view", resource == File::"93");
-"#;
-    let policy: PolicySet = POLICY_SRC.parse().unwrap();
-
-    let action = r#"Action::"view""#.parse().unwrap();
-
-    let alice = r#"User::"alice""#.parse().unwrap();
-    let file = r#"File::"93""#.parse().unwrap();
-    let request = Request::new(alice, action, file, Context::empty(), None).unwrap();
-
-    let entities = Entities::empty();
-    let authorizer = Authorizer::new();
-    let answer = authorizer.is_authorized(&request, &policy, &entities);
-
-    // Should output `Allow`
-    println!("{:?}", answer.decision());
-
-    let action = r#"Action::"view""#.parse().unwrap();
-    let bob = r#"User::"bob""#.parse().unwrap();
-    let file = r#"File::"93""#.parse().unwrap();
-    let request = Request::new(bob, action, file, Context::empty(), None).unwrap();
-
-    let answer = authorizer.is_authorized(&request, &policy, &entities);
-
-    // Should output `Deny`
-    println!("{:?}", answer.decision());
-}
-
-#[tokio::main(flavor = "current_thread")]
-async fn main() {
+fn main() {
     let cedarling = Cedarling::new(AuthzConfig, JwtConfig);
     println!("cedarling initialized");
-    cedarling.authz().await;
+
+    cedarling.authz(); // authz will probably fail since jwks hasn't been updated yet
+                       // what if i don't want authz to fail here?
     println!("authz done");
-    run_cedar();
-    create_uuid();
+
+    cedarling.print_jwks(); // jwks will not be here
+    thread::sleep(Duration::from_secs(2));
+
+    cedarling.print_jwks(); // jwks will finially be
 }
