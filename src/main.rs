@@ -2,7 +2,7 @@ use ehttp::Request;
 use std::{
     sync::{Arc, RwLock},
     thread,
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 #[allow(dead_code)]
@@ -20,6 +20,24 @@ impl Cedarling {
 
     fn authz(&self) {
         self.jwt.validate_tokens();
+        if !self.wait_for_jwks(Duration::from_secs(5)) {
+            eprintln!("JWKS not available. Authorization may fail.");
+        }
+        self.authz.perform_authz();
+    }
+
+    fn wait_for_jwks(&self, timeout: Duration) -> bool {
+        let start = Instant::now();
+        while start.elapsed() < timeout {
+            {
+                let jwks = self.jwt.jwks.read().unwrap();
+                if jwks.is_some() {
+                    return true; // JWKS is available
+                }
+            }
+            thread::sleep(Duration::from_millis(100)); // Poll every 100ms
+        }
+        false // JWKS not available within timeout
     }
 
     fn print_jwks(&self) {
@@ -34,6 +52,11 @@ struct AuthzConfig;
 impl Authz {
     fn new(config: AuthzConfig) -> Self {
         Self(config)
+    }
+
+    fn perform_authz(&self) {
+        // Implementation of your authorization logic goes here
+        println!("Performing authorization...");
     }
 }
 
@@ -72,12 +95,7 @@ fn main() {
     let cedarling = Cedarling::new(AuthzConfig, JwtConfig);
     println!("cedarling initialized");
 
-    cedarling.authz(); // authz will probably fail since jwks hasn't been updated yet
-                       // what if i don't want authz to fail here?
+    cedarling.authz();
     println!("authz done");
-
-    cedarling.print_jwks(); // jwks will not be here
-    thread::sleep(Duration::from_secs(2));
-
-    cedarling.print_jwks(); // jwks will finially be
+    cedarling.print_jwks(); // jwks should be here now
 }
