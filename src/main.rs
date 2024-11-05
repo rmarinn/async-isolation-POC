@@ -63,6 +63,13 @@ impl Jwt {
 //     println!("Uuid Generated: {uuid:?}");
 // }
 
+// NOTE: replace uuid7 with uuid
+use uuid::Uuid;
+fn create_uuid() {
+    let uuid = Uuid::new_v4();
+    println!("Uuid Generated: {uuid:?}");
+}
+
 fn run_cedar() {
     println!("Testing Cedar:");
 
@@ -102,5 +109,5 @@ async fn main() {
     cedarling.authz().await;
     println!("authz done");
     run_cedar();
-    // create_uuid();
+    create_uuid();
 }
