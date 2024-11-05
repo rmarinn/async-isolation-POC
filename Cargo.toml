@@ -4,8 +4,5 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-anyhow = "1.0.92"
-futures = "0.3.31"
-futures-timer = "3.0.3"
 threadpool = "1.8.1"
 tokio = { version = "1.41.0", features = ["macros", "rt-multi-thread", "time"] }
